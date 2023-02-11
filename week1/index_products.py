@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(format='%(levelname)s:%(message)s')
 
+_BATCH_SIZE = 2000
+
 # NOTE: this is not a complete list of fields.  If you wish to add more, put in the appropriate XPath expression.
 #TODO: is there a way to do this using XPath/XSL Functions so that we don't have to maintain a big list?
 mappings =  [
@@ -81,11 +83,19 @@ mappings =  [
         ]
 
 def get_opensearch():
-    host = 'localhost'
+    host = '0.0.0.0'
     port = 9200
     auth = ('admin', 'admin')
     #### Step 2.a: Create a connection to OpenSearch
-    client = None
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': port}],
+        http_compress=True,  # enables gzip compression for request bodies
+        http_auth=auth,
+        use_ssl=False,
+        verify_certs=False,
+        ssl_assert_hostname=False,
+        ssl_show_warn=False,
+    )
     return client
 
 
@@ -98,7 +108,7 @@ def index_file(file, index_name):
     children = root.findall("./product")
     docs = []
     for child in children:
-        doc = {}
+        doc = {"_index": index_name}
         for idx in range(0, len(mappings), 2):
             xpath_expr = mappings[idx]
             key = mappings[idx + 1]
@@ -107,8 +117,14 @@ def index_file(file, index_name):
         if 'productId' not in doc or len(doc['productId']) == 0:
             continue
         #### Step 2.b: Create a valid OpenSearch Doc and bulk index 2000 docs at a time
-        the_doc = None
-        docs.append(the_doc)
+        docs.append(doc)
+        if len(docs) == _BATCH_SIZE:
+            success, _ = bulk(client, docs)
+            docs_indexed += success
+            docs = []
+
+    success, _ = bulk(client, docs)
+    docs_indexed += success
 
     return docs_indexed
 
