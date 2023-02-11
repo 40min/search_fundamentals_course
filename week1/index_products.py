@@ -83,7 +83,7 @@ mappings =  [
         ]
 
 def get_opensearch():
-    host = '0.0.0.0'
+    host = 'localhost'
     port = 9200
     auth = ('admin', 'admin')
     #### Step 2.a: Create a connection to OpenSearch

@@ -7,7 +7,7 @@ def get_opensearch():
         #### Step 4.a:
         # Implement a client connection to OpenSearch so that the rest of the application can communicate with OpenSearch
 
-        host = '0.0.0.0'
+        host = 'localhost'
         port = 9200
         auth = ('admin', 'admin')
         client = OpenSearch(
