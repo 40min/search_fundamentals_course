@@ -1,5 +1,8 @@
 import math
 # some helpful tools for dealing with queries
+from typing import Any, Dict
+
+
 def create_stats_query(aggs, extended=True):
     print("Creating stats query from %s" % aggs)
     agg_map = {}
@@ -159,16 +162,30 @@ def create_query(user_query, filters, sort="_score", sortDir="desc", size=10, in
 # Give a user query from the UI and the query object we've built so far, adding in spelling suggestions
 def add_spelling_suggestions(query_obj, user_query):
     #### W2, L2, S1
-    print("TODO: IMPLEMENT ME")
-    #query_obj["suggest"] = {
-    #    "text": user_query,
-    #    "phrase_suggest": {
-
-    #    },
-    #    "term_suggest": {
-
-    #    }
-    #}
+    query_obj["suggest"] = {
+        "text": user_query,
+        "phrase_suggest": {
+            "phrase": {
+                "field": "suggest.trigrams",
+                "direct_generator": [{
+                    "field": "title.trigrams",
+                    "min_word_length": 2,
+                    "suggest_mode": "popular"
+                }],
+                "highlight": {
+                    "pre_tag": "<em>",
+                    "post_tag": "</em>"
+                }
+            }
+        },
+        "term_suggest": {
+            "term": {
+                "field": "suggest.text",
+                "min_word_length": 3,
+                "suggest_mode": "popular"
+            }
+        }
+    }
 
 
 # Given the user query from the UI, the query object we've built so far and a Pandas data GroupBy data frame,
@@ -205,7 +222,7 @@ def add_aggs(query_obj):
         },
         "missing_images": {
             "missing": {
-                "field": "image"
+                "field": "image.keyword"
             }
         },
         "regularPrice": {
@@ -227,4 +244,19 @@ def add_aggs(query_obj):
             }
         }
 
+    }
+
+
+def create_autocomplete_query(prefix: str) -> Dict[str, Any]:
+    return {
+        "_source": False,
+        "suggest": {
+            "autocomplete": {
+                "prefix": prefix,
+                "completion": {
+                    "field": "suggest",
+                    "skip_duplicates": True
+                }
+            }
+        }
     }
