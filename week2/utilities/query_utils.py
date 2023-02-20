@@ -1,5 +1,8 @@
 import math
 # some helpful tools for dealing with queries
+from typing import Any, Dict
+
+
 def create_stats_query(aggs, extended=True):
     print("Creating stats query from %s" % aggs)
     agg_map = {}
@@ -154,36 +157,67 @@ def create_query(user_query, filters, sort="_score", sortDir="desc", size=10, in
 
 
 ##########
-# Week 2, Level 2: 
+# Week 2, Level 2:
 ##########
 # Give a user query from the UI and the query object we've built so far, adding in spelling suggestions
 def add_spelling_suggestions(query_obj, user_query):
     #### W2, L2, S1
-    print("TODO: IMPLEMENT ME")
-    #query_obj["suggest"] = {
-    #    "text": user_query,
-    #    "phrase_suggest": {
-
-    #    },
-    #    "term_suggest": {
-
-    #    }
-    #}
+    query_obj["suggest"] = {
+        "text": user_query,
+        "phrase_suggest": {
+            "phrase": {
+                "field": "suggest.trigrams",
+                "direct_generator": [{
+                    "field": "suggest.trigrams",
+                    "min_word_length": 2,
+                    "suggest_mode": "popular"
+                }],
+                "highlight": {
+                    "pre_tag": "<em>",
+                    "post_tag": "</em>"
+                }
+            }
+        },
+        "term_suggest": {
+            "term": {
+                "field": "suggest.text",
+                "min_word_length": 3,
+                "suggest_mode": "popular"
+            }
+        }
+    }
 
 
 # Given the user query from the UI, the query object we've built so far and a Pandas data GroupBy data frame,
 # construct and add a query that consists of the ids from the items that were clicked on by users for that query
 # priors_gb (loaded in __init__.py) is grouped on query and has a Series of SKUs/doc ids for every document that was cliecked on for this query
 def add_click_priors(query_obj, user_query, priors_gb):
+    if user_query == "*":  # we don't want to create extra-load for default query match_all
+        return
     try:
         prior_clicks_for_query = priors_gb.get_group(user_query)
         if prior_clicks_for_query is not None and len(prior_clicks_for_query) > 0:
             click_prior = ""
             #### W2, L1, S1
             # Create a string object of SKUs and weights that will boost documents matching the SKU
-            print("TODO: Implement me")
+
+            num_queries = len(prior_clicks_for_query.index)
+            user_query_group_sku_grouped = prior_clicks_for_query.sku.value_counts()
+            min_weight = 0.0001
+            for sku, num_clicks in user_query_group_sku_grouped.items():
+                sku_weight = num_clicks / num_queries
+                if sku_weight > min_weight:
+                    sku_weight_round = round(sku_weight, 4)
+                    click_prior = f"{click_prior} {sku}^{sku_weight_round}"
+
             if click_prior != "":
-                click_prior_query_obj = None # Implement a query object that matches on the ID or SKU with weights of
+                click_prior_query_obj = {
+                    "query_string": {
+                        "fields": ["sku"],
+                        "query": f"({click_prior})",
+                        "boost": 100
+                    }
+                }
                 # This may feel like cheating, but it's really not, esp. in ecommerce where you have all this prior data,
                 if click_prior_query_obj is not None:
                     query_obj["query"]["function_score"]["query"]["bool"]["should"].append(click_prior_query_obj)
@@ -205,7 +239,7 @@ def add_aggs(query_obj):
         },
         "missing_images": {
             "missing": {
-                "field": "image"
+                "field": "image.keyword"
             }
         },
         "regularPrice": {
@@ -227,4 +261,18 @@ def add_aggs(query_obj):
             }
         }
 
+    }
+
+
+def create_autocomplete_query(prefix: str) -> Dict[str, Any]:
+    return {
+        "suggest": {
+            "autocomplete": {
+                "prefix": prefix,
+                "completion": {
+                    "field": "suggest",
+                    "skip_duplicates": True
+                }
+            }
+        }
     }
