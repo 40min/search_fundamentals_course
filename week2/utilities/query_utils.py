@@ -266,7 +266,6 @@ def add_aggs(query_obj):
 
 def create_autocomplete_query(prefix: str) -> Dict[str, Any]:
     return {
-        "_source": False,
         "suggest": {
             "autocomplete": {
                 "prefix": prefix,
